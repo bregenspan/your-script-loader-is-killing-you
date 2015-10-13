@@ -443,6 +443,11 @@
 
         moveChartIfNeeded(Reveal.getCurrentSlide());
 
+        // Set an initial zoom on chart so we get a zoom-out effect when displaying it
+        zoomToElements(bars, function (item) {
+            return (item.firstParty && !item.stats && item.type !== 'image');
+        }, 0.1);
+
         // Handle initial transition-in if we started on a slide with a state
         handleStateChange(null, Reveal.getCurrentSlide().dataset.state);
     });
