@@ -88,11 +88,9 @@ rect {
 }
 
 .chart-zoom-firstparty-images {
-  rect {
+  rect.thirdparty,
+	rect:not(.filetype-image) {
     fill: $disabled-color;
-  }
-  rect.filetype-image {
-    fill: red;
   }
 }
 

@@ -84,11 +84,9 @@ rect {
 .chart-highlight-thirdparty rect.firstparty {
   fill: #666; }
 
-.chart-zoom-firstparty-images rect {
+.chart-zoom-firstparty-images rect.thirdparty,
+.chart-zoom-firstparty-images rect:not(.filetype-image) {
   fill: #666; }
-
-.chart-zoom-firstparty-images rect.filetype-image {
-  fill: red; }
 
 .chart-zoom-firstparty-ignore-images rect.thirdparty,
 .chart-zoom-firstparty rect.thirdparty {

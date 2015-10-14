@@ -417,7 +417,7 @@
             function () {
                 zoomToElements(bars, function (item) {
                     return (item.firstParty && !item.stats);
-                });
+                }, 0.1);
             }, resetZoom);
 
         registerStateChange('chartZoomFirstpartyImages',
