@@ -81,15 +81,15 @@ rect {
   fill: white;
   cursor: pointer; }
 
-.chart-highlight-thirdparty rect.firstparty {
+.chart-highlight-thirdparty rect.tag-first-party {
   fill: #666; }
 
-.chart-zoom-firstparty-images rect.thirdparty,
+.chart-zoom-firstparty-images rect:not(.tag-first-party),
 .chart-zoom-firstparty-images rect:not(.filetype-image) {
   fill: #666; }
 
-.chart-zoom-firstparty-ignore-images rect.thirdparty,
-.chart-zoom-firstparty rect.thirdparty {
+.chart-zoom-firstparty-ignore-images rect:not(.tag-first-party),
+.chart-zoom-firstparty rect:not(.tag-first-party) {
   fill: #666; }
 
 .chart-zoom-firstparty-ignore-images rect.filetype-image {

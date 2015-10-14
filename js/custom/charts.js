@@ -1,32 +1,31 @@
 (function () {
     'use strict';
 
-    var config = {
-        // Domains to consider as first-party
-        firstPartyWhitelist: ['kinja.com', 'kinja-img.com', 'kinja-static.com'],
+    var firstPartyWhitelist, firstPartyRegex, config, chartContainer;
 
-        // Tags that should be added to files matching the specified regexes
+    // Domains to consider as first-party
+    firstPartyWhitelist = ['gawker.com', 'kinja.com', 'kinja-img.com', 'kinja-static.com'];
+    firstPartyRegex = new RegExp('(' + firstPartyWhitelist.join('|').replace(/\./g, '\\.') + ')$');
+
+    config = {
+
+        // Tags that should be added to files matching the specified regexes or filter functions
         fileTags: {
             scriptLoader: /require\.js/i,
-            mainScript: /javascripts\-min\/layer\/.*\.js$/i
+            mainScript: /javascripts\-min\/layer\/.*\.js$/i,
+            firstParty: function (item) {
+                return Boolean(item.domain.match(firstPartyRegex));
+            },
+            stats: function (item) {
+                return (item.domain.match(firstPartyRegex) && item.path.indexOf('/stats/') === 0);
+            }
         },
 
         itemHeight: 10,  // item height, in SVG coordinate units
         itemMargin: 2   // margin between items, in SVG coordinate units
-    },
-    chartContainer = document.querySelector('.chart');
+    };
 
-    /**
-     * Given array of request objects, return a regular expression of first-party requests
-     * (FIXME: this is Kinja-specific - move out to config)
-     * @param {array[object]} requests - array of request objects
-     * @returns {RegExp} regex for identifying "first-party" requests
-     */
-    function getFirstPartyRegex(requests) {
-        // Kinja-specific regex for identifying first-party requests
-        config.firstPartyWhitelist.push(requests[0].domain);  // whitelist base page domain
-        return new RegExp('(' + config.firstPartyWhitelist.join('|').replace(/\./g, '\\.') + ')$');
-    }
+    chartContainer = document.querySelector('.chart');
 
     function toClassName(state) {
         // Replace camel-cased state name with hyphenated lowercase classname
@@ -44,15 +43,12 @@
      *  - {number} duration - request duration (ms)
      *  - {number} start - request start time (ms)
      *  - {number} end - request end time (ms)
-     *  - {boolean} firstParty - whether request is a first-party request
-     *  - {boolean} stats - whether request is a first-party stats-related request
      */
     function getRequestsFromHar(harData) {
         var harLog = harData.log,
             startDate = new Date(harLog.pages[0].startedDateTime),
             onLoad = harLog.pages[0].pageTimings.onLoad,
-            items = [],
-            firstPartyRegex;
+            items = [];
 
         // No support for multi-page HAR files at moment -- filter entries to first page
         if (harLog.pages.length > 1) {
@@ -83,17 +79,24 @@
         }
 
         /**
-         * Given a URL, return object whose keys represent identified filename-based tags,
-         * and `true` as a value for all identified tags.
+         * Given a timeline entry object, return object whose keys represent identified filename-based tags,
+         * with `true` as the value for all identified tags.
          */
-        function getFileTags(url) {
+        function getFileTags(entry) {
             var tags = {};
     
+            function getMatchFunction(regex) {
+                return function (entry) {
+                    return Boolean(entry.url.match(regex));
+                };
+            }
+
             Object.keys(config.fileTags).forEach(function (tagName) {
-                var regex = config.fileTags[tagName];
-                if (url.match(regex)) {
-                    tags[tagName] = true;
+                var filter = config.fileTags[tagName];
+                if (typeof filter !== 'function') {  // assume regex
+                    filter = getMatchFunction(filter);
                 }
+                tags[tagName] = Boolean(filter(entry));
             });
 
             return tags;
@@ -104,7 +107,6 @@
                 url = urlAbbreviate(entry.request.url);
 
             return {
-                tags: getFileTags(url),
                 type: mimeToFiletype(entry.response.content.mimeType || ''),
                 originalUrl: entry.request.url,
                 url: url,
@@ -116,24 +118,14 @@
             };
         });
 
+        // Add configurable tags to each file
+        items.forEach(function (item) {
+            item.tags = getFileTags(item);
+        });
+
         // Ignore requests which arrived after onload event
         items = items.filter(function (item) {
             return (item.start <= onLoad);
-        });
-
-        console.log(items.length, 'total requests');
-
-        // And augment with some Kinja page-specific info (FIXME: move out for reusability)
-        firstPartyRegex = getFirstPartyRegex(items);
-        items = items.map(function (entry) {
-
-            // Mark first-party requests as such
-            entry.firstParty = Boolean(entry.domain.match(firstPartyRegex));
-
-            // Mark internal stats requests as such
-            entry.stats = (entry.firstParty && entry.path.indexOf('/stats/') === 0);
-
-            return entry;
         });
 
         return items;
@@ -194,7 +186,7 @@
         document.getElementsByTagName('svg')[0].style.transform = '' +
             'scaleX(' + (max.x / filteredMax.x) + ') ' +
             'scaleY(' + (max.y / filteredMax.y) + ')';
-			// still rather blurry for me in Chrome...
+            // still rather blurry for me in Chrome...
             //'scale3d(' + (max.x / filteredMax.x) + ', ' + (max.y / filteredMax.y) + ', 1.0)';
     }
 
@@ -238,10 +230,11 @@
             })
             .each(function (d) {
                 this.classList.add('filetype-' + d.type);
-                this.classList.add(d.firstParty ? 'firstparty' : 'thirdparty');
 
                 Object.keys(d.tags).forEach(function (tagName) {
-                    this.classList.add('tag-' + toClassName(tagName));
+                    if (d.tags[tagName]) {
+                        this.classList.add('tag-' + toClassName(tagName));
+                    }
                 }.bind(this));
             })
             .on('mouseover', function (d) {
@@ -416,21 +409,21 @@
         registerStateChange('chartZoomFirstparty',
             function () {
                 zoomToElements(bars, function (item) {
-                    return (item.firstParty && !item.stats);
+                    return (item.tags.firstParty && !item.tags.stats);
                 }, 0.1);
             }, resetZoom);
 
         registerStateChange('chartZoomFirstpartyImages',
             function () {
                 zoomToElements(bars, function (item) {
-                    return (item.firstParty && !item.stats && item.type === 'image');
+                    return (item.tags.firstParty && !item.tags.stats && item.type === 'image');
                 }, 0.1);
             }, resetZoom);
 
         registerStateChange('chartZoomFirstpartyIgnoreImages',
             function () {
                 zoomToElements(bars, function (item) {
-                    return (item.firstParty && !item.stats && item.type !== 'image');
+                    return (item.tags.firstParty && !item.tags.stats && item.type !== 'image');
                 }, 0.1);
             }, resetZoom);
 
@@ -445,7 +438,7 @@
 
         // Set an initial zoom on chart so we get a zoom-out effect when displaying it
         zoomToElements(bars, function (item) {
-            return (item.firstParty && !item.stats && item.type !== 'image');
+            return (item.tags.firstParty && !item.tags.stats && item.type !== 'image');
         }, 0.1);
 
         // Handle initial transition-in if we started on a slide with a state

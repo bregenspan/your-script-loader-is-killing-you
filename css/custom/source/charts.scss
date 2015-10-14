@@ -82,13 +82,13 @@ rect {
 }
 
 .chart-highlight-thirdparty {
-  rect.firstparty {
+  rect.tag-first-party {
     fill: $disabled-color;
   }
 }
 
 .chart-zoom-firstparty-images {
-  rect.thirdparty,
+  rect:not(.tag-first-party),
 	rect:not(.filetype-image) {
     fill: $disabled-color;
   }
@@ -96,7 +96,7 @@ rect {
 
 .chart-zoom-firstparty-ignore-images,
 .chart-zoom-firstparty {
-  rect.thirdparty {
+  rect:not(.tag-first-party) {
     fill: $disabled-color;
   }
 }
