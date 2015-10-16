@@ -1,11 +1,31 @@
 (function () {
     'use strict';
 
-    var firstPartyWhitelist, firstPartyRegex, config, chartContainer;
+    var amazonDomainsRegex, firstPartyRegex, config, chartContainer, googleAdDomainsRegex;
+
+	function arrayToDomainRegex (domains) {
+		return new RegExp('(' + domains.join('|').replace(/\./g, '\\.') + ')$');
+	}
 
     // Domains to consider as first-party
-    firstPartyWhitelist = ['gawker.com', 'kinja.com', 'kinja-img.com', 'kinja-static.com'];
-    firstPartyRegex = new RegExp('(' + firstPartyWhitelist.join('|').replace(/\./g, '\\.') + ')$');
+    firstPartyRegex = arrayToDomainRegex(['gawker.com', 'kinja.com', 'kinja-img.com', 'kinja-static.com']);
+
+	domains = {
+		google: ['googletagservices.com', 'googleadservices.com', 'googlesyndication.com', 'doubleclick.net', '2mdn.net'],
+		amazon: ['amazon-adsystem.com'],
+		comscore: ['scorecardresearch.com'],
+		quantcast: ['quantserve.com'],
+		skimlinks: ['skimresources.com'],
+		moat: ['moatads.com'],
+		integral: ['adsafeprotected.com'],
+		ghostery: ['betrad.com'],
+		researchNow: ['researchnow.com'],
+		adobeAudienceManager: ['demdex.net']
+	};
+
+	googleAdDomainsRegex = arrayToDomainRegex(['googletagservices.com', 'googleadservices.com', 'googlesyndication.com', 'doubleclick.net']);
+
+	amazonDomainsRegex = arrayToDomainRegex(['amazon-adsystem.com']);
 
     config = {
 
@@ -18,7 +38,13 @@
             },
             stats: function (item) {
                 return (item.domain.match(firstPartyRegex) && item.path.indexOf('/stats/') === 0);
-            }
+            },
+			vendorGoogleAds: function (item) {
+				return item.domain.match(googleAdDomainsRegex);
+			},
+			vendorAmazon: function (item) {
+
+			}
         },
 
         itemHeight: 10,  // item height, in SVG coordinate units
