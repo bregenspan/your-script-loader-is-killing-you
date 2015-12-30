@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var amazonDomainsRegex, firstPartyRegex, config, chartContainer, googleAdDomainsRegex;
+    var amazonDomainsRegex, firstPartyRegex, config, chartContainer, googleAdDomainsRegex, providers;
 
 	function arrayToDomainRegex (domains) {
 		return new RegExp('(' + domains.join('|').replace(/\./g, '\\.') + ')$');
@@ -10,24 +10,49 @@
     // Domains to consider as first-party
     firstPartyRegex = arrayToDomainRegex(['gawker.com', 'kinja.com', 'kinja-img.com', 'kinja-static.com']);
 
-	domains = {
-		google: ['googletagservices.com', 'googleadservices.com', 'googlesyndication.com', 'doubleclick.net', '2mdn.net'],
-		amazon: ['amazon-adsystem.com'],
-		comscore: ['scorecardresearch.com'],
-		quantcast: ['quantserve.com'],
-		skimlinks: ['skimresources.com'],
-		moat: ['moatads.com'],
-		integral: ['adsafeprotected.com'],
-		ghostery: ['betrad.com'],
-		researchNow: ['researchnow.com'],
-		adobeAudienceManager: ['demdex.net']
-	};
-
 	googleAdDomainsRegex = arrayToDomainRegex(['googletagservices.com', 'googleadservices.com', 'googlesyndication.com', 'doubleclick.net']);
 
 	amazonDomainsRegex = arrayToDomainRegex(['amazon-adsystem.com']);
 
     config = {
+
+		providers: {
+			adobeAudienceManager: ['demdex.net'],
+			amazon: ['amazon-adsystem.com'],
+			chartbeat: ['chartbeat.com', 'chartbeat.net'],
+			comscore: ['scorecardresearch.com'],
+			criteo: ['criteo.com'],
+			ghostery: ['betrad.com'],
+			google: ['googletagservices.com', 'googleadservices.com', 'googlesyndication.com', 'doubleclick.net', '2mdn.net'],
+			googleAnalytics: ['google-analytics.com'],
+			integral: ['adsafeprotected.com', 'iasds01.com'],
+			krux: ['krxd.net', 'krux.com'],
+			moat: ['moatads.com'],
+			nielsen: ['imrworldwide.com'],
+			quantcast: ['quantserve.com'],
+			researchNow: ['researchnow.com'],
+			skimlinks: ['skimresources.com']
+		},
+
+		providerGroups: {
+			'ads': [
+				'adobeAudienceManager',
+				'amazon',
+				'ghostery',
+				'google',
+				'integral',
+				'moat',
+				'researchNow',
+				'skimlinks'
+			],
+			'analytics': [
+				'cheartbeat',
+				'comscore',
+				'googleAnalytics',
+				'quantcast',
+				'nielsen'
+			]
+		},
 
         // Tags that should be added to files matching the specified regexes or filter functions
         fileTags: {
@@ -43,7 +68,7 @@
 				return item.domain.match(googleAdDomainsRegex);
 			},
 			vendorAmazon: function (item) {
-
+				return item.domain.match(amazonDomainsRegex);
 			}
         },
 
@@ -128,6 +153,17 @@
             return tags;
         }
 
+		function getProviders(entry) {
+			var providers = {};
+			Object.keys(config.providers).forEach(function (providerName) {
+				var providerRegex = arrayToDomainRegex(config.providers[providerName]);
+				if (entry.domain.match(providerRegex)) {
+					providers[providerName] = true;
+				}
+			});
+			return providers;
+		}
+
         items = harLog.entries.map(function (entry) {
             var startTimeMs = new Date(entry.startedDateTime) - startDate,
                 url = urlAbbreviate(entry.request.url);
@@ -146,8 +182,9 @@
 
         // Add configurable tags to each file
         items.forEach(function (item) {
-            item.tags = getFileTags(item);
-        });
+			item.tags = getFileTags(item);
+			item.providers = getProviders(item);
+		});
 
         // Ignore requests which arrived after onload event
         items = items.filter(function (item) {
@@ -233,6 +270,15 @@
             .style('opacity', 0)
             .attr('class', 'tooltip');
 
+		function getProvidersDisplayName(providers) {
+			return Object.keys(providers).filter(function (providerName) {
+				return Boolean(providers[providerName]);
+			}).map(function (providerName) {
+				providerName = providerName.replace(/([a-z])([A-Z])/g, '$1 $2');
+				return providerName.charAt(0).toUpperCase() + providerName.slice(1);
+			}).join(' / ');
+		}
+
         bars = svg.selectAll('rect')
             .data(data)
             .enter().append('rect')
@@ -262,6 +308,12 @@
                         this.classList.add('tag-' + toClassName(tagName));
                     }
                 }.bind(this));
+
+				Object.keys(d.providers).forEach(function (providerName) {
+					if (d.providers[providerName]) {
+						this.classList.add('provider-' + providerName);
+					}
+				}.bind(this));
             })
             .on('mouseover', function (d) {
                 window.postMessage(JSON.stringify({
@@ -290,7 +342,8 @@
         window.addEventListener('message', function showTooltip(event) {
             var data = JSON.parse(event.data),
                 itemData,
-                itemEl;
+                itemEl,
+				provider;
 
             if (window.parent && window.parent !== window) {
                 window.parent.postMessage(event.data, '*');
@@ -301,9 +354,11 @@
                 itemEl = document.getElementById(data.id);
 
                 if (data.eventName === 'showTooltip') {
+					provider =  getProvidersDisplayName(itemData.providers);
                     itemEl.classList.add('selected');
                     tooltip
                         .html('<p>' + itemData.url + '</p>' +
+							  (provider ? '<p>Provider: ' + provider + '</p>' : '') +
                             '<p>' +
                                 'Start: ' + msToRoundedS(itemData.start) + ' / ' +
                                 'End: ' + msToRoundedS(itemData.end) +
