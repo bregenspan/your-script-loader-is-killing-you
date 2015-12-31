@@ -210,15 +210,6 @@
 
 				} );
 
-				// Sync custom chart-related events to parent window
-				// TODO: move out to a plugin
-				window.addEventListener('message', function( event ) {
-					var data = JSON.parse(event.data);
-					if (data && data.namespace === 'reveal-chart') {
-						window.opener.postMessage(event.data, '*');
-					}
-				});
-
 				/**
 				 * Called when the main window is trying to establish a
 				 * connection.
